@@ -213,34 +213,21 @@ func createSplits(cfg config.Config, wsID, worktreeDir, mainSurface string, side
 		return nil
 	}
 
-	updates <- StepUpdate{Pane: sidePanes[0].Name, Status: "starting"}
-	rightSurface, err := cmux.NewSplit("right", wsID)
-	if err != nil {
-		return fmt.Errorf("right split: %w", err)
-	}
-	time.Sleep(300 * time.Millisecond)
+	lastSurface := mainSurface
+	for _, pane := range sidePanes {
+		direction := pane.Split
+		if direction == "" {
+			direction = "right"
+		}
 
-	if len(sidePanes) == 1 {
-		result.Surfaces[sidePanes[0].Name] = rightSurface
-		launchInPane(wsID, rightSurface, sidePanes[0], worktreeDir)
-		updates <- StepUpdate{Pane: sidePanes[0].Name, Status: "ready", Done: true}
-		return nil
-	}
-
-	result.Surfaces[sidePanes[0].Name] = rightSurface
-	launchInPane(wsID, rightSurface, sidePanes[0], worktreeDir)
-	updates <- StepUpdate{Pane: sidePanes[0].Name, Status: "ready", Done: true}
-
-	lastSurface := rightSurface
-	for i := 1; i < len(sidePanes); i++ {
-		pane := sidePanes[i]
 		updates <- StepUpdate{Pane: pane.Name, Status: "starting"}
 
-		surface, err := cmux.NewSplitOnPanel("down", wsID, lastSurface)
+		surface, err := cmux.NewSplitOnPanel(direction, wsID, lastSurface)
 		if err != nil {
 			updates <- StepUpdate{Pane: pane.Name, Status: "failed", Err: err}
 			continue
 		}
+		time.Sleep(300 * time.Millisecond)
 
 		result.Surfaces[pane.Name] = surface
 		launchInPane(wsID, surface, pane, worktreeDir)

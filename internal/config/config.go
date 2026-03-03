@@ -28,7 +28,7 @@ type LayoutConfig struct {
 type PaneConfig struct {
 	Name     string `toml:"name"`
 	Command  string `toml:"command"`
-	Position string `toml:"position"`
+	Split    string `toml:"split"`
 	Disabled bool   `toml:"disabled"`
 }
 
@@ -64,9 +64,9 @@ func DefaultConfig() Config {
 		},
 		Layout: LayoutConfig{
 			Panes: []PaneConfig{
-				{Name: "crush", Command: "crush -c {{worktree_dir}}", Position: "main"},
-				{Name: "lazygit", Command: "lazygit", Position: "right"},
-				{Name: "helix", Command: "hx .", Position: "bottom-right"},
+				{Name: "crush", Command: "crush -c {{worktree_dir}}", Split: "main"},
+				{Name: "lazygit", Command: "lazygit", Split: "right"},
+				{Name: "helix", Command: "hx .", Split: "down"},
 			},
 		},
 	}
@@ -147,7 +147,7 @@ func (c Config) EnabledPanes() []PaneConfig {
 
 func (c Config) MainPane() (PaneConfig, bool) {
 	for _, p := range c.EnabledPanes() {
-		if p.Position == "main" {
+		if p.Split == "main" {
 			return p, true
 		}
 	}
@@ -157,7 +157,7 @@ func (c Config) MainPane() (PaneConfig, bool) {
 func (c Config) SidePanes() []PaneConfig {
 	var panes []PaneConfig
 	for _, p := range c.EnabledPanes() {
-		if p.Position != "main" {
+		if p.Split != "main" {
 			panes = append(panes, p)
 		}
 	}
