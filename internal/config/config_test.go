@@ -74,12 +74,12 @@ func TestMainPane(t *testing.T) {
 	if !ok {
 		t.Fatal("expected main pane")
 	}
-	if main.Position != "main" {
-		t.Errorf("expected position 'main', got %q", main.Position)
+	if main.Split != "main" {
+		t.Errorf("expected split 'main', got %q", main.Split)
 	}
 
 	cfg.Layout.Panes = []PaneConfig{
-		{Name: "side", Command: "echo", Position: "right"},
+		{Name: "side", Command: "echo", Split: "right"},
 	}
 	_, ok = cfg.MainPane()
 	if ok {
@@ -94,7 +94,7 @@ func TestSidePanes(t *testing.T) {
 		t.Errorf("expected 2 side panes, got %d", len(sides))
 	}
 	for _, p := range sides {
-		if p.Position == "main" {
+		if p.Split == "main" {
 			t.Error("side panes should not include main")
 		}
 	}

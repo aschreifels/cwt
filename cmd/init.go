@@ -50,13 +50,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	editorCmd = "hx ."
 	gitTool = "lazygit"
-	for _, p := range cfg.Layout.Panes {
-		if p.Position == "right" && !p.Disabled {
-			gitTool = p.Command
-		}
-		if p.Position == "bottom-right" && !p.Disabled {
-			editorCmd = p.Command
-		}
+	sidePanes := cfg.SidePanes()
+	if len(sidePanes) > 0 {
+		gitTool = sidePanes[0].Command
+	}
+	if len(sidePanes) > 1 {
+		editorCmd = sidePanes[1].Command
 	}
 
 	form := huh.NewForm(
@@ -137,9 +136,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	cfg.Layout.Panes = []config.PaneConfig{
-		{Name: "crush", Command: "crush -c {{worktree_dir}}", Position: "main"},
-		{Name: gitTool, Command: gitTool, Position: "right"},
-		{Name: "editor", Command: editorCmd, Position: "bottom-right"},
+		{Name: "crush", Command: "crush -c {{worktree_dir}}", Split: "main"},
+		{Name: gitTool, Command: gitTool, Split: "right"},
+		{Name: "editor", Command: editorCmd, Split: "down"},
 	}
 
 	if err := config.Save(cfg); err != nil {
