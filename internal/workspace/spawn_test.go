@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/aschreifels/cwt/internal/config"
@@ -120,32 +121,55 @@ func TestResolvePrompt(t *testing.T) {
 	cfg.ProjectManagement.Provider = "linear"
 	cfg.ProjectManagement.DefaultProject = "PROJ"
 
-	t.Run("returns empty when no project management", func(t *testing.T) {
+	t.Run("returns skill loading prompt when no project management", func(t *testing.T) {
 		noCfg := config.DefaultConfig()
 		got := resolvePrompt(noCfg, SpawnOpts{Ticket: "PROJ-1"})
-		if got != "" {
-			t.Errorf("expected empty, got %q", got)
+		if got != skillLoadingPrompt {
+			t.Errorf("expected skill loading prompt only, got %q", got)
 		}
 	})
 
-	t.Run("returns fetch prompt for ticket", func(t *testing.T) {
+	t.Run("returns fetch prompt with skill loading suffix for ticket", func(t *testing.T) {
 		got := resolvePrompt(cfg, SpawnOpts{Ticket: "PROJ-1", Name: "feat"})
 		if got == "" {
 			t.Error("expected non-empty fetch prompt")
 		}
+		if !strings.Contains(got, "PROJ-1") {
+			t.Error("expected prompt to contain ticket ID")
+		}
+		if !strings.Contains(got, skillLoadingPrompt) {
+			t.Error("expected prompt to contain skill loading suffix")
+		}
 	})
 
-	t.Run("returns create prompt for draft", func(t *testing.T) {
+	t.Run("returns create prompt with skill loading suffix for draft", func(t *testing.T) {
 		got := resolvePrompt(cfg, SpawnOpts{CreateDraft: true, Name: "feat"})
 		if got == "" {
 			t.Error("expected non-empty create prompt")
 		}
+		if !strings.Contains(got, skillLoadingPrompt) {
+			t.Error("expected prompt to contain skill loading suffix")
+		}
 	})
 
-	t.Run("returns empty when no ticket or draft", func(t *testing.T) {
+	t.Run("returns skill loading prompt when no ticket or draft", func(t *testing.T) {
 		got := resolvePrompt(cfg, SpawnOpts{Name: "feat"})
-		if got != "" {
-			t.Errorf("expected empty, got %q", got)
+		if got != skillLoadingPrompt {
+			t.Errorf("expected skill loading prompt only, got %q", got)
+		}
+	})
+
+	t.Run("always includes skill loading prompt", func(t *testing.T) {
+		cases := []SpawnOpts{
+			{Name: "feat"},
+			{Name: "feat", Ticket: "PROJ-1"},
+			{Name: "feat", CreateDraft: true},
+		}
+		for _, opts := range cases {
+			got := resolvePrompt(cfg, opts)
+			if !strings.Contains(got, skillLoadingPrompt) {
+				t.Errorf("opts %+v: expected skill loading prompt in result", opts)
+			}
 		}
 	})
 }

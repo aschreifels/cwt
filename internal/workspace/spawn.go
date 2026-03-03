@@ -192,20 +192,25 @@ func Spawn(cfg config.Config, opts SpawnOpts, updates chan<- StepUpdate) (*Spawn
 	return result, nil
 }
 
+const skillLoadingPrompt = "IMPORTANT: Before doing anything else, load your cmux-notifications skill " +
+	"and use it throughout this session. Once loaded, set your cmux status to ready: " +
+	"`cmux set-status \"crush\" \"ready\" --icon \"sparkle\" --color \"#22c55e\"`"
+
 func resolvePrompt(cfg config.Config, opts SpawnOpts) string {
-	if !cfg.HasProjectManagement() {
-		return ""
+	var prompt string
+
+	if cfg.HasProjectManagement() {
+		if opts.Ticket != "" {
+			prompt = cfg.RenderPrompt(cfg.ProjectManagement.Prompts.Fetch, opts.Ticket, opts.Name)
+		} else if opts.CreateDraft {
+			prompt = cfg.RenderPrompt(cfg.ProjectManagement.Prompts.Create, "", opts.Name)
+		}
 	}
 
-	if opts.Ticket != "" {
-		return cfg.RenderPrompt(cfg.ProjectManagement.Prompts.Fetch, opts.Ticket, opts.Name)
+	if prompt != "" {
+		return prompt + "\n\n" + skillLoadingPrompt
 	}
-
-	if opts.CreateDraft {
-		return cfg.RenderPrompt(cfg.ProjectManagement.Prompts.Create, "", opts.Name)
-	}
-
-	return ""
+	return skillLoadingPrompt
 }
 
 func createSplits(cfg config.Config, wsID, worktreeDir, mainSurface string, sidePanes []config.PaneConfig, result *SpawnResult, updates chan<- StepUpdate) error {
