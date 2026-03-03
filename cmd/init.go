@@ -1,0 +1,168 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/aschreifels/cwt/internal/config"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/spf13/cobra"
+)
+
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Set up cwt with a guided configuration wizard",
+	Long:  "Walks you through setting up cwt — branch prefix, project management provider, layout, and more.",
+	RunE:  runInit,
+}
+
+func init() {
+	rootCmd.AddCommand(initCmd)
+}
+
+func runInit(cmd *cobra.Command, args []string) error {
+	cfg := config.DefaultConfig()
+
+	existing, err := config.Load()
+	if err == nil {
+		cfg = existing
+	}
+
+	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#a78bfa"))
+	fmt.Println()
+	fmt.Println(title.Render("  cwt init — Crush Worktree Tool Setup"))
+	fmt.Println()
+
+	var branchPrefix string
+	var provider string
+	var defaultProject string
+	var editorCmd string
+	var gitTool string
+
+	branchPrefix = cfg.Defaults.BranchPrefix
+	if cfg.ProjectManagement.Provider == "" || cfg.ProjectManagement.Provider == "none" {
+		provider = "none"
+	} else {
+		provider = cfg.ProjectManagement.Provider
+	}
+	defaultProject = cfg.ProjectManagement.DefaultProject
+
+	editorCmd = "hx ."
+	gitTool = "lazygit"
+	for _, p := range cfg.Layout.Panes {
+		if p.Position == "right" && !p.Disabled {
+			gitTool = p.Command
+		}
+		if p.Position == "bottom-right" && !p.Disabled {
+			editorCmd = p.Command
+		}
+	}
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Branch prefix").
+				Description("Prepended to all branch names (e.g. your initials). Leave empty for none.").
+				Placeholder("initials").
+				Value(&branchPrefix),
+
+			huh.NewSelect[string]().
+				Title("Project management provider").
+				Description("Which tool do you use for tickets/issues?").
+				Options(
+					huh.NewOption("Linear", "linear"),
+					huh.NewOption("GitHub Issues", "github"),
+					huh.NewOption("Jira", "jira"),
+					huh.NewOption("None", "none"),
+				).
+				Value(&provider),
+
+			huh.NewInput().
+				Title("Default project/team key").
+				Description("Used when creating draft tickets (e.g. PROJ, BACKEND, INFRA).").
+				Placeholder("PROJ").
+				Value(&defaultProject),
+		),
+
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Git tool").
+				Description("TUI for the top-right pane.").
+				Options(
+					huh.NewOption("lazygit", "lazygit"),
+					huh.NewOption("gitui", "gitui"),
+					huh.NewOption("tig", "tig"),
+					huh.NewOption("Custom", "custom"),
+				).
+				Value(&gitTool),
+
+			huh.NewInput().
+				Title("Editor command").
+				Description("Command for the bottom-right pane.").
+				Placeholder("hx .").
+				Value(&editorCmd),
+		),
+	)
+
+	err = form.Run()
+	if err != nil {
+		return err
+	}
+
+	if gitTool == "custom" {
+		customForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Custom git tool command").
+					Placeholder("lazygit").
+					Value(&gitTool),
+			),
+		)
+		if err := customForm.Run(); err != nil {
+			return err
+		}
+	}
+
+	cfg.Defaults.BranchPrefix = branchPrefix
+	cfg.ProjectManagement.Provider = provider
+	cfg.ProjectManagement.DefaultProject = defaultProject
+
+	defaults := config.DefaultConfig()
+	if cfg.ProjectManagement.Prompts.Fetch == "" {
+		cfg.ProjectManagement.Prompts.Fetch = defaults.ProjectManagement.Prompts.Fetch
+	}
+	if cfg.ProjectManagement.Prompts.Create == "" {
+		cfg.ProjectManagement.Prompts.Create = defaults.ProjectManagement.Prompts.Create
+	}
+
+	cfg.Layout.Panes = []config.PaneConfig{
+		{Name: "crush", Command: "crush -c {{worktree_dir}}", Position: "main"},
+		{Name: gitTool, Command: gitTool, Position: "right"},
+		{Name: "editor", Command: editorCmd, Position: "bottom-right"},
+	}
+
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	success := lipgloss.NewStyle().Foreground(lipgloss.Color("#22c55e"))
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("#6b7280"))
+
+	fmt.Println()
+	fmt.Println(success.Render("  Config saved ✓"))
+	fmt.Println(dim.Render(fmt.Sprintf("  %s", config.ConfigPath())))
+	fmt.Println()
+	fmt.Println("  Get started:")
+	fmt.Println(dim.Render("    cwt spawn my-feature"))
+	fmt.Println(dim.Render("    cwt spawn my-feature -t PROJ-123"))
+	fmt.Println(dim.Render("    cwt spawn my-feature --draft"))
+	fmt.Println()
+
+	return nil
+}
+
+func ConfigExists() bool {
+	_, err := os.Stat(config.ConfigPath())
+	return err == nil
+}

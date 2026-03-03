@@ -1,0 +1,25 @@
+# Binaries
+cwt
+*.exe
+
+# Build output
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Go
+*.test
+*.out
+coverage.txt
+
+# asdf
+.tool-versions
