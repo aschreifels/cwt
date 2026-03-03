@@ -1,5 +1,16 @@
 # cmux Sidebar Notifications
 
+**MANDATORY: You MUST use cmux notifications for every task. This is not optional.**
+
+- **Before starting any work**: set status to "working" and log what you're doing.
+- **After completing any task**: notify the user, update status to "done", and clear progress.
+- **On errors or blockers**: notify immediately and set error status.
+- **When you need user input**: notify and set blocked status.
+
+Failure to use cmux notifications is treated the same as failing to complete the task. Every task begins and ends with a cmux call.
+
+---
+
 Use the cmux CLI to keep the user informed of task progress directly in the cmux workspace sidebar. The environment variables `CMUX_WORKSPACE_ID` and `CMUX_SURFACE_ID` are auto-set in cmux terminals — no need to pass `--workspace`.
 
 ## When to Notify (User Action Required)
