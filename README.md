@@ -170,15 +170,23 @@ cwt skills install cmux-notifications
 cwt skills install --force
 ```
 
-Skills are installed to `~/.config/crush/skills/`. Ensure your `~/.config/crush/crush.json` includes:
+Skills are installed to `~/.config/crush/skills/`. After installing, add them to your global Crush context in `~/.config/crush/crush.json`:
 
-```json
+```jsonc
 {
   "options": {
-    "skills_paths": ["~/.config/crush/skills"]
+    "skills_paths": [
+      "~/.config/crush/skills"
+    ],
+    "context_paths": [
+      "~/.config/crush/skills/cmux-notifications/SKILL.md",
+      "~/.config/crush/skills/cwt-orchestrator/SKILL.md"
+    ]
   }
 }
 ```
+
+`context_paths` ensures the skills are loaded into every Crush session automatically, so Crush always knows how to use cmux notifications and orchestrate worktrees.
 
 ## How It Works
 
