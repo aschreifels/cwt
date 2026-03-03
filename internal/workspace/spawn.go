@@ -218,11 +218,28 @@ func createSplits(cfg config.Config, wsID, worktreeDir, mainSurface string, side
 		return nil
 	}
 
-	lastSurface := mainSurface
-	for _, pane := range sidePanes {
+	firstDirection := sidePanes[0].Split
+	if firstDirection == "" {
+		firstDirection = "right"
+	}
+
+	updates <- StepUpdate{Pane: sidePanes[0].Name, Status: "starting"}
+	firstSurface, err := cmux.NewSplit(firstDirection, wsID)
+	if err != nil {
+		return fmt.Errorf("%s split: %w", firstDirection, err)
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	result.Surfaces[sidePanes[0].Name] = firstSurface
+	launchInPane(wsID, firstSurface, sidePanes[0], worktreeDir)
+	updates <- StepUpdate{Pane: sidePanes[0].Name, Status: "ready", Done: true}
+
+	lastSurface := firstSurface
+	for i := 1; i < len(sidePanes); i++ {
+		pane := sidePanes[i]
 		direction := pane.Split
 		if direction == "" {
-			direction = "right"
+			direction = "down"
 		}
 
 		updates <- StepUpdate{Pane: pane.Name, Status: "starting"}
