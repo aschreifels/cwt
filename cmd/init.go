@@ -31,15 +31,20 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#a78bfa"))
 	fmt.Println()
-	fmt.Println(title.Render("  cwt init — Crush Worktree Tool Setup"))
+	fmt.Println(title.Render("  cwt init — cmux Worktree Tool Setup"))
 	fmt.Println()
 
+	var agent string
 	var branchPrefix string
 	var provider string
 	var defaultProject string
 	var editorCmd string
 	var gitTool string
 
+	agent = cfg.Defaults.Agent
+	if agent == "" {
+		agent = config.AgentCrush
+	}
 	branchPrefix = cfg.Defaults.BranchPrefix
 	if cfg.ProjectManagement.Provider == "" || cfg.ProjectManagement.Provider == "none" {
 		provider = "none"
@@ -60,6 +65,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	form := huh.NewForm(
 		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("AI agent").
+				Description("Which AI coding agent do you use?").
+				Options(
+					huh.NewOption("Crush", config.AgentCrush),
+					huh.NewOption("Claude Code", config.AgentClaude),
+				).
+				Value(&agent),
+
 			huh.NewInput().
 				Title("Branch prefix").
 				Description("Prepended to all branch names (e.g. your initials). Leave empty for none.").
@@ -123,11 +137,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	cfg.Defaults.Agent = agent
 	cfg.Defaults.BranchPrefix = branchPrefix
 	cfg.ProjectManagement.Provider = provider
 	cfg.ProjectManagement.DefaultProject = defaultProject
 
-	defaults := config.DefaultConfig()
+	defaults := config.DefaultConfigForAgent(agent)
 	if cfg.ProjectManagement.Prompts.Fetch == "" {
 		cfg.ProjectManagement.Prompts.Fetch = defaults.ProjectManagement.Prompts.Fetch
 	}
@@ -135,8 +150,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 		cfg.ProjectManagement.Prompts.Create = defaults.ProjectManagement.Prompts.Create
 	}
 
+	agentDefaults := config.DefaultConfigForAgent(agent)
+	mainPane := agentDefaults.Layout.Panes[0]
 	cfg.Layout.Panes = []config.PaneConfig{
-		{Name: "crush", Command: "crush -c {{worktree_dir}}", Split: "main"},
+		mainPane,
 		{Name: gitTool, Command: gitTool, Split: "right"},
 		{Name: "editor", Command: editorCmd, Split: "down"},
 	}

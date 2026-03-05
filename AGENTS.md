@@ -1,8 +1,8 @@
-# AGENTS.md — cwt (Crush Worktree Tool)
+# AGENTS.md — cwt (cmux Worktree Tool)
 
 ## What This Project Is
 
-`cwt` is a Go CLI that creates git worktrees with full [cmux](https://github.com/charmbracelet/cmux) dev environments. Each worktree gets its own Crush AI assistant, git TUI, and editor in a multi-pane workspace. It supports ticket integration (Linear, GitHub Issues, Jira) and bundles installable Crush skills.
+`cwt` is a Go CLI that creates git worktrees with full [cmux](https://github.com/charmbracelet/cmux) dev environments. Each worktree gets its own AI coding agent (Crush or Claude Code), git TUI, and editor in a multi-pane workspace. It supports ticket integration (Linear, GitHub Issues, Jira) and bundles installable agent skills.
 
 ## Commands
 
@@ -33,7 +33,7 @@ cmd/
   init.go                        # cwt init — TUI config wizard (charmbracelet/huh)
   list.go                        # cwt list/ls — lists active worktrees
   rm.go                          # cwt rm — removes worktrees, optional branch delete
-  skills.go                      # cwt skills list/install — manages Crush skills
+  skills.go                      # cwt skills list/install — manages agent skills (Crush + Claude Code)
   version.go                     # cwt version — prints version info (injected via ldflags)
 internal/
   config/
@@ -51,8 +51,8 @@ internal/
 skills/
   skills.go                      # Skill registry using //go:embed
   skills_test.go                 # Verifies all embedded skills exist and have content
-  cmux-notifications/SKILL.md    # Skill: teaches Crush to use cmux sidebar APIs
-  cwt-orchestrator/SKILL.md      # Skill: teaches Crush to orchestrate parallel worktrees
+  cmux-notifications/SKILL.md    # Skill: teaches agent to use cmux sidebar APIs
+  cwt-orchestrator/SKILL.md      # Skill: teaches agent to orchestrate parallel worktrees
 ```
 
 ## Architecture and Key Patterns
@@ -66,10 +66,11 @@ skills/
 ### Config System (`internal/config`)
 - TOML config at `~/.config/cwt/config.toml` (respects `XDG_CONFIG_HOME`)
 - `Config` struct with `Defaults`, `Layout`, and `ProjectManagement` sections
-- `DefaultConfig()` provides sensible defaults (3 panes: crush, lazygit, helix)
-- `Load()` merges file config with defaults — empty prompts and empty pane lists are backfilled
+- `Defaults.Agent` field: `"crush"` (default) or `"claude"` — determines pane commands, prompt injection, and skill installation
+- `DefaultConfig()` provides sensible defaults for Crush; `DefaultConfigForAgent(agent)` for agent-specific defaults
+- `Load()` merges file config with defaults — empty prompts, empty pane lists, and empty agent are backfilled
 - Template rendering via `strings.NewReplacer` with `{{provider}}`, `{{ticket}}`, `{{project}}`, `{{name}}`, `{{worktree_dir}}`
-- Helper methods on `Config`: `EnabledPanes()`, `MainPane()`, `SidePanes()`, `HasProjectManagement()`, `RenderPrompt()`
+- Helper methods on `Config`: `EnabledPanes()`, `MainPane()`, `SidePanes()`, `HasProjectManagement()`, `IsClaude()`, `RenderPrompt()`
 
 ### External Tool Integration
 - **git**: All git operations in `internal/git/git.go` via `exec.Command` — no git library
@@ -80,11 +81,13 @@ skills/
 ### Spawn Flow (`workspace.Spawn`)
 1. Build branch name (prefix + ticket + name)
 2. Resolve worktree directory (config override or `../worktrees/<name>`)
-3. Create git worktree (or reuse existing)
-4. Create cmux workspace with main pane
-5. Create right/bottom splits for side panes
-6. Inject ticket prompt into Crush via `cmux send-text`
-7. Set cmux sidebar status (branch, base, ticket, provider)
+3. Resolve prompt (agent-specific skill loading prompt + ticket context)
+4. Build main command (for Claude: appends prompt as CLI arg; for Crush: plain command)
+5. Create git worktree (or reuse existing)
+6. Create cmux workspace with main pane
+7. Create right/bottom splits for side panes
+8. Inject prompt: Crush via `cmux send-text`, Claude via CLI argument to `claude "prompt"`
+9. Set cmux sidebar status (branch, base, ticket, provider)
 - Progress is reported via `chan StepUpdate` → Bubble Tea model
 
 ### TUI (`internal/tui`)
@@ -102,7 +105,9 @@ skills/
 - Skills are embedded at compile time via `//go:embed` directives in `skills/skills.go`
 - Each skill is a `SKILL.md` file in a subdirectory under `skills/`
 - `skills.All()` returns the full registry
-- Installation copies embedded content to `~/.config/crush/skills/<dir>/SKILL.md`
+- Installation is agent-aware:
+  - **Crush**: copies to `~/.config/crush/skills/<dir>/SKILL.md`
+  - **Claude Code**: appends to `~/.claude/CLAUDE.md` with `<!-- cwt-skill:name -->` markers for idempotent updates
 
 ## Code Conventions
 
@@ -111,7 +116,7 @@ skills/
 - Error wrapping with `fmt.Errorf("context: %w", err)` — consistent `context: %w` pattern
 - Package-level vars for cobra flags and lipgloss styles
 - Exported functions use clear verb-noun names: `BuildBranchName`, `ResolveWorktreeDir`, `ResolveBaseBranch`
-- Unexported helpers: `expandCommand`, `shellQuote`, `resolvePrompt`, `parseSurface`
+- Unexported helpers: `expandCommand`, `shellQuote`, `resolvePrompt`, `buildMainCommand`, `skillLoadingPrompt`, `parseSurface`
 - No constructor functions for simple structs — use struct literals directly
 
 ### Error Handling

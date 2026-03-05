@@ -16,6 +16,7 @@ type Config struct {
 }
 
 type DefaultsConfig struct {
+	Agent        string `toml:"agent"`
 	BranchPrefix string `toml:"branch_prefix"`
 	BaseBranch   string `toml:"base_branch"`
 	WorktreeDir  string `toml:"worktree_dir"`
@@ -43,8 +44,20 @@ type PromptConfig struct {
 	Create string `toml:"create"`
 }
 
+const (
+	AgentCrush  = "crush"
+	AgentClaude = "claude"
+)
+
 func DefaultConfig() Config {
-	return Config{
+	return DefaultConfigForAgent(AgentCrush)
+}
+
+func DefaultConfigForAgent(agent string) Config {
+	cfg := Config{
+		Defaults: DefaultsConfig{
+			Agent: agent,
+		},
 		ProjectManagement: ProjectManagementConfig{
 			Provider: "none",
 			Prompts: PromptConfig{
@@ -62,14 +75,28 @@ func DefaultConfig() Config {
 					"and acceptance criteria based on what was actually built.",
 			},
 		},
-		Layout: LayoutConfig{
+	}
+
+	switch agent {
+	case AgentClaude:
+		cfg.Layout = LayoutConfig{
+			Panes: []PaneConfig{
+				{Name: "claude", Command: "claude", Split: "main"},
+				{Name: "lazygit", Command: "lazygit", Split: "right"},
+				{Name: "helix", Command: "hx .", Split: "down"},
+			},
+		}
+	default:
+		cfg.Layout = LayoutConfig{
 			Panes: []PaneConfig{
 				{Name: "crush", Command: "crush -c {{worktree_dir}}", Split: "main"},
 				{Name: "lazygit", Command: "lazygit", Split: "right"},
 				{Name: "helix", Command: "hx .", Split: "down"},
 			},
-		},
+		}
 	}
+
+	return cfg
 }
 
 func configDir() string {
@@ -99,8 +126,12 @@ func Load() (Config, error) {
 		return cfg, fmt.Errorf("parsing config: %w", err)
 	}
 
+	if cfg.Defaults.Agent == "" {
+		cfg.Defaults.Agent = AgentCrush
+	}
+
 	if len(cfg.Layout.Panes) == 0 {
-		cfg.Layout.Panes = DefaultConfig().Layout.Panes
+		cfg.Layout.Panes = DefaultConfigForAgent(cfg.Defaults.Agent).Layout.Panes
 	}
 
 	defaults := DefaultConfig()
@@ -166,6 +197,10 @@ func (c Config) SidePanes() []PaneConfig {
 
 func (c Config) HasProjectManagement() bool {
 	return c.ProjectManagement.Provider != "" && c.ProjectManagement.Provider != "none"
+}
+
+func (c Config) IsClaude() bool {
+	return c.Defaults.Agent == AgentClaude
 }
 
 func (c Config) RenderPrompt(template, ticket, name string) string {

@@ -15,7 +15,7 @@ Use the cmux CLI to keep the user informed of task progress directly in the cmux
 
 ## When to Notify (User Action Required)
 
-Send a **notification** (toast) whenever the user needs to look at Crush's output or take action:
+Send a **notification** (toast) whenever the user needs to look at the agent's output or take action:
 
 - Task list fully completed
 - Blocked and need user input, decision, or clarification
@@ -48,7 +48,7 @@ cmux clear-progress
 
 ### Log (sidebar activity feed)
 ```bash
-cmux log --level <info|warn|error> --source "Crush" -- "<message>"
+cmux log --level <info|warn|error> --source "cwt" -- "<message>"
 ```
 
 ### Notifications (toast/banner — user should look now)
@@ -60,8 +60,8 @@ cmux notify --title "<title>" --body "<body>"
 
 1. **Task start**: Set status and log it
    ```bash
-   cmux set-status "crush" "working" --icon "hammer" --color "#f59e0b"
-   cmux log --level info --source "Crush" -- "Starting: <task description>"
+   cmux set-status "cwt" "working" --icon "hammer" --color "#f59e0b"
+   cmux log --level info --source "cwt" -- "Starting: <task description>"
    ```
 
 2. **Progress updates** (for multi-step tasks): Update progress as fraction complete
@@ -71,36 +71,36 @@ cmux notify --title "<title>" --body "<body>"
 
 3. **Task complete**: Notify user, update status, clear progress
    ```bash
-   cmux set-status "crush" "done" --icon "check" --color "#22c55e"
+   cmux set-status "cwt" "done" --icon "check" --color "#22c55e"
    cmux clear-progress
-   cmux notify --title "Crush" --body "All tasks complete"
-   cmux log --level info --source "Crush" -- "Done: <summary>"
+   cmux notify --title "cwt" --body "All tasks complete"
+   cmux log --level info --source "cwt" -- "Done: <summary>"
    ```
 
 4. **Need user input**: Notify and set blocked status
    ```bash
-   cmux set-status "crush" "needs input" --icon "chat-circle" --color "#3b82f6"
-   cmux notify --title "Crush" --body "Need your input: <brief reason>"
-   cmux log --level warn --source "Crush" -- "Waiting: <details>"
+   cmux set-status "cwt" "needs input" --icon "chat-circle" --color "#3b82f6"
+   cmux notify --title "cwt" --body "Need your input: <brief reason>"
+   cmux log --level warn --source "cwt" -- "Waiting: <details>"
    ```
 
 5. **Error/blocker**: Notify and set error status
    ```bash
-   cmux set-status "crush" "error" --icon "warning" --color "#ef4444"
-   cmux notify --title "Crush" --body "Hit an error — need your help"
-   cmux log --level error --source "Crush" -- "<error details>"
+   cmux set-status "cwt" "error" --icon "warning" --color "#ef4444"
+   cmux notify --title "cwt" --body "Hit an error — need your help"
+   cmux log --level error --source "cwt" -- "<error details>"
    ```
 
 6. **Ready for review** (PR, commit, code changes):
    ```bash
-   cmux set-status "crush" "review" --icon "eye" --color "#8b5cf6"
-   cmux notify --title "Crush" --body "Ready for your review"
-   cmux log --level info --source "Crush" -- "Ready for review: <what>"
+   cmux set-status "cwt" "review" --icon "eye" --color "#8b5cf6"
+   cmux notify --title "cwt" --body "Ready for your review"
+   cmux log --level info --source "cwt" -- "Ready for review: <what>"
    ```
 
 7. **Cleanup** (after user acknowledges or conversation ends):
    ```bash
-   cmux clear-status "crush"
+   cmux clear-status "cwt"
    cmux clear-progress
    ```
 
@@ -108,7 +108,7 @@ cmux notify --title "<title>" --body "<body>"
 `sparkle`, `hammer`, `check`, `warning`, `chat-circle`, `eye`, `magnifying-glass`, `code`, `gear`, `rocket`, `bug`, `lightning`
 
 ## Rules
-- Always use `--source "Crush"` for log entries
+- Always use `--source "cwt"` for log entries
 - Keep status values short (1-2 words)
 - Keep notification bodies under one sentence
 - Clear progress when done — don't leave stale bars
