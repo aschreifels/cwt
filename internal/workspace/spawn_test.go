@@ -121,11 +121,11 @@ func TestResolvePrompt(t *testing.T) {
 	cfg.ProjectManagement.Provider = "linear"
 	cfg.ProjectManagement.DefaultProject = "PROJ"
 
-	t.Run("returns skill loading prompt when no project management", func(t *testing.T) {
+	t.Run("returns crush skill loading prompt when no project management", func(t *testing.T) {
 		noCfg := config.DefaultConfig()
 		got := resolvePrompt(noCfg, SpawnOpts{Ticket: "PROJ-1"})
-		if got != skillLoadingPrompt {
-			t.Errorf("expected skill loading prompt only, got %q", got)
+		if got != crushSkillLoadingPrompt {
+			t.Errorf("expected crush skill loading prompt only, got %q", got)
 		}
 	})
 
@@ -137,7 +137,7 @@ func TestResolvePrompt(t *testing.T) {
 		if !strings.Contains(got, "PROJ-1") {
 			t.Error("expected prompt to contain ticket ID")
 		}
-		if !strings.Contains(got, skillLoadingPrompt) {
+		if !strings.Contains(got, crushSkillLoadingPrompt) {
 			t.Error("expected prompt to contain skill loading suffix")
 		}
 	})
@@ -147,15 +147,15 @@ func TestResolvePrompt(t *testing.T) {
 		if got == "" {
 			t.Error("expected non-empty create prompt")
 		}
-		if !strings.Contains(got, skillLoadingPrompt) {
+		if !strings.Contains(got, crushSkillLoadingPrompt) {
 			t.Error("expected prompt to contain skill loading suffix")
 		}
 	})
 
 	t.Run("returns skill loading prompt when no ticket or draft", func(t *testing.T) {
 		got := resolvePrompt(cfg, SpawnOpts{Name: "feat"})
-		if got != skillLoadingPrompt {
-			t.Errorf("expected skill loading prompt only, got %q", got)
+		if got != crushSkillLoadingPrompt {
+			t.Errorf("expected crush skill loading prompt only, got %q", got)
 		}
 	})
 
@@ -167,9 +167,61 @@ func TestResolvePrompt(t *testing.T) {
 		}
 		for _, opts := range cases {
 			got := resolvePrompt(cfg, opts)
-			if !strings.Contains(got, skillLoadingPrompt) {
-				t.Errorf("opts %+v: expected skill loading prompt in result", opts)
+			if !strings.Contains(got, crushSkillLoadingPrompt) {
+				t.Errorf("opts %+v: expected crush skill loading prompt in result", opts)
 			}
+		}
+	})
+
+	t.Run("claude agent uses claude skill loading prompt", func(t *testing.T) {
+		claudeCfg := config.DefaultConfigForAgent(config.AgentClaude)
+		claudeCfg.ProjectManagement.Provider = "linear"
+		claudeCfg.ProjectManagement.DefaultProject = "PROJ"
+
+		got := resolvePrompt(claudeCfg, SpawnOpts{Ticket: "PROJ-1", Name: "feat"})
+		if !strings.Contains(got, claudeSkillLoadingPrompt) {
+			t.Error("expected claude skill loading prompt")
+		}
+		if strings.Contains(got, crushSkillLoadingPrompt) {
+			t.Error("should not contain crush skill loading prompt")
+		}
+	})
+
+	t.Run("claude agent returns claude prompt when no ticket", func(t *testing.T) {
+		claudeCfg := config.DefaultConfigForAgent(config.AgentClaude)
+		got := resolvePrompt(claudeCfg, SpawnOpts{Name: "feat"})
+		if got != claudeSkillLoadingPrompt {
+			t.Errorf("expected claude skill loading prompt, got %q", got)
+		}
+	})
+}
+
+func TestBuildMainCommand(t *testing.T) {
+	t.Run("crush agent ignores prompt in command", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		pane := config.PaneConfig{Name: "crush", Command: "crush -c {{worktree_dir}}", Split: "main"}
+		got := buildMainCommand(cfg, pane, "/tmp/wt", "do something")
+		want := "crush -c /tmp/wt"
+		if got != want {
+			t.Errorf("buildMainCommand: got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("claude agent appends prompt to command", func(t *testing.T) {
+		cfg := config.DefaultConfigForAgent(config.AgentClaude)
+		pane := config.PaneConfig{Name: "claude", Command: "claude", Split: "main"}
+		got := buildMainCommand(cfg, pane, "/tmp/wt", "do something")
+		if got != "claude 'do something'" {
+			t.Errorf("buildMainCommand: got %q", got)
+		}
+	})
+
+	t.Run("claude agent with empty prompt", func(t *testing.T) {
+		cfg := config.DefaultConfigForAgent(config.AgentClaude)
+		pane := config.PaneConfig{Name: "claude", Command: "claude", Split: "main"}
+		got := buildMainCommand(cfg, pane, "/tmp/wt", "")
+		if got != "claude" {
+			t.Errorf("buildMainCommand: got %q, want %q", got, "claude")
 		}
 	})
 }

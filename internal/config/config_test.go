@@ -31,6 +31,60 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.ProjectManagement.Prompts.Create == "" {
 		t.Error("expected default create prompt to be non-empty")
 	}
+
+	if cfg.Defaults.Agent != AgentCrush {
+		t.Errorf("expected default agent 'crush', got %q", cfg.Defaults.Agent)
+	}
+}
+
+func TestDefaultConfigForAgent(t *testing.T) {
+	t.Run("crush agent", func(t *testing.T) {
+		cfg := DefaultConfigForAgent(AgentCrush)
+		if cfg.Defaults.Agent != AgentCrush {
+			t.Errorf("expected agent 'crush', got %q", cfg.Defaults.Agent)
+		}
+		main, ok := cfg.MainPane()
+		if !ok {
+			t.Fatal("expected main pane")
+		}
+		if main.Name != "crush" {
+			t.Errorf("expected main pane 'crush', got %q", main.Name)
+		}
+	})
+
+	t.Run("claude agent", func(t *testing.T) {
+		cfg := DefaultConfigForAgent(AgentClaude)
+		if cfg.Defaults.Agent != AgentClaude {
+			t.Errorf("expected agent 'claude', got %q", cfg.Defaults.Agent)
+		}
+		main, ok := cfg.MainPane()
+		if !ok {
+			t.Fatal("expected main pane")
+		}
+		if main.Name != "claude" {
+			t.Errorf("expected main pane 'claude', got %q", main.Name)
+		}
+		if main.Command != "claude" {
+			t.Errorf("expected command 'claude', got %q", main.Command)
+		}
+	})
+}
+
+func TestIsClaude(t *testing.T) {
+	tests := []struct {
+		agent string
+		want  bool
+	}{
+		{AgentCrush, false},
+		{AgentClaude, true},
+		{"", false},
+	}
+	for _, tt := range tests {
+		cfg := Config{Defaults: DefaultsConfig{Agent: tt.agent}}
+		if got := cfg.IsClaude(); got != tt.want {
+			t.Errorf("IsClaude() with agent=%q: got %v, want %v", tt.agent, got, tt.want)
+		}
+	}
 }
 
 func TestHasProjectManagement(t *testing.T) {

@@ -23,14 +23,14 @@ var spawnCmd = &cobra.Command{
 	Short: "Create a worktree with a full cmux dev workspace",
 	Long: `Creates a git worktree and cmux workspace with configurable panes.
 
-The --ticket flag fetches an existing ticket and seeds crush with its context.
+The --ticket flag fetches an existing ticket and seeds your AI agent with its context.
 The --draft flag creates a new draft ticket that gets updated as you work.
 Both require project_management.provider to be set in config.
 
-Default layout:
+Default layout (configurable via cwt init):
   ┌──────────────┬───────────┐
   │              │  lazygit  │
-  │    crush     ├───────────┤
+  │ crush/claude ├───────────┤
   │              │  helix .  │
   └──────────────┴───────────┘`,
 	Example: `  cwt spawn my-feature

@@ -19,13 +19,13 @@ func All() []Skill {
 	return []Skill{
 		{
 			Name:        "cmux-notifications",
-			Description: "Teaches Crush to use cmux sidebar APIs (status, progress, log, notify)",
+			Description: "Teaches your AI agent to use cmux sidebar APIs (status, progress, log, notify)",
 			Dir:         "cmux-notifications",
 			Content:     CmuxNotifications,
 		},
 		{
 			Name:        "cwt-orchestrator",
-			Description: "Teaches Crush to analyze projects and spawn parallel worktrees via cwt",
+			Description: "Teaches your AI agent to analyze projects and spawn parallel worktrees via cwt",
 			Dir:         "cwt-orchestrator",
 			Content:     CwtOrchestrator,
 		},

@@ -1,28 +1,29 @@
-# cwt — Crush Worktree Tool
+# cwt — cmux Worktree Tool
 
-`cwt` creates [git worktrees](https://git-scm.com/docs/git-worktree) with full [cmux](https://github.com/charmbracelet/cmux) dev environments — each with its own [Crush](https://github.com/charmbracelet/crush) AI assistant, git TUI, and editor, all in one workspace.
+`cwt` creates [git worktrees](https://git-scm.com/docs/git-worktree) with full [cmux](https://github.com/charmbracelet/cmux) dev environments — each with its own AI coding agent, git TUI, and editor, all in one workspace. Supports both [Crush](https://github.com/charmbracelet/crush) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 ```
 ┌──────────────┬───────────┐
 │              │  lazygit  │
-│    crush     ├───────────┤
+│ crush/claude ├───────────┤
 │              │  helix .  │
 └──────────────┴───────────┘
 ```
 
 ## Features
 
+- **Agent-agnostic** — choose between Crush or Claude Code as your AI assistant
 - **One command** to create a worktree + cmux workspace with configurable panes
-- **Ticket integration** — fetch Linear/GitHub/Jira tickets and inject context into Crush automatically
+- **Ticket integration** — fetch Linear/GitHub/Jira tickets and inject context into your agent automatically
 - **Draft mode** — create new tickets on the fly and track work incrementally
 - **Guided setup** — `cwt init` walks you through configuration via a TUI wizard
-- **Bundled Crush skills** — install skills that teach Crush to use cmux notifications and orchestrate parallel worktrees
+- **Bundled skills** — install skills that teach your agent to use cmux notifications and orchestrate parallel worktrees
 - **Beautiful TUI** — animated boot sequence with per-pane status spinners
 
 ## Prerequisites
 
 - [cmux](https://github.com/charmbracelet/cmux) installed and running
-- [Crush](https://github.com/charmbracelet/crush) installed
+- [Crush](https://github.com/charmbracelet/crush) and/or [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 - [Git](https://git-scm.com/) 2.15+ (worktree support)
 - [Go](https://go.dev/) 1.24+ (to build from source)
 
@@ -46,7 +47,7 @@ make install
 ## Quick Start
 
 ```bash
-# First-time setup (or run cwt spawn — it auto-triggers init)
+# First-time setup — picks your AI agent, git tool, editor, etc.
 cwt init
 
 # Create a worktree with a full dev environment
@@ -76,8 +77,8 @@ cwt rm my-feature -D
 | `cwt rm <name>` | Remove a worktree (optionally delete branch with `-D`) |
 | `cwt list` | List active worktrees (alias: `ls`) |
 | `cwt init` | Guided configuration wizard |
-| `cwt skills list` | List bundled Crush skills |
-| `cwt skills install` | Install Crush skills to `~/.config/crush/skills/` |
+| `cwt skills list` | List bundled agent skills |
+| `cwt skills install` | Install agent skills |
 | `cwt version` | Print version info |
 
 ### `cwt spawn` flags
@@ -87,7 +88,7 @@ cwt rm my-feature -D
 | `-b, --base <branch>` | Base branch (auto-detects `main`/`master`) |
 | `--branch <branch>` | Checkout an existing branch |
 | `--existing` | Use existing branch matching `<name>` |
-| `-t, --ticket <ID>` | Fetch a ticket and seed Crush with its context |
+| `-t, --ticket <ID>` | Fetch a ticket and seed your agent with its context |
 | `-d, --draft` | Create a draft ticket for this worktree |
 | `--no-editor` | Skip launching programs |
 
@@ -99,6 +100,7 @@ Config lives at `~/.config/cwt/config.toml`. Run `cwt init` for guided setup, or
 
 ```toml
 [defaults]
+agent = "crush"          # "crush" or "claude"
 branch_prefix = "jd"
 base_branch = ""
 worktree_dir = ""
@@ -114,29 +116,39 @@ create = "Create a draft {{provider}} issue in project {{project}}..."
 [[layout.panes]]
 name = "crush"
 command = "crush -c {{worktree_dir}}"
-position = "main"
+split = "main"
 
 [[layout.panes]]
 name = "lazygit"
 command = "lazygit"
-position = "right"
+split = "right"
 
 [[layout.panes]]
 name = "editor"
 command = "hx ."
-position = "bottom-right"
+split = "down"
+```
+
+For Claude Code, set `agent = "claude"` and the main pane defaults to:
+
+```toml
+[[layout.panes]]
+name = "claude"
+command = "claude"
+split = "main"
 ```
 
 ### Key settings
 
 | Setting | Description |
 |---|---|
+| `defaults.agent` | AI agent: `crush` (default) or `claude` |
 | `defaults.branch_prefix` | Prepended to branch names (e.g. `jd` → `jd/PROJ-123_feature`) |
 | `defaults.base_branch` | Override auto-detected base branch |
 | `defaults.worktree_dir` | Override default worktree location |
 | `project_management.provider` | `linear`, `github`, `jira`, or `none` |
 | `project_management.default_project` | Default project key for draft tickets |
-| `layout.panes` | Array of pane configs with `name`, `command`, `position`, `disabled` |
+| `layout.panes` | Array of pane configs with `name`, `command`, `split`, `disabled` |
 
 ### Template variables
 
@@ -150,12 +162,12 @@ Prompt templates and pane commands support these variables:
 | `{{name}}` | Worktree name |
 | `{{worktree_dir}}` | Absolute path to the worktree |
 
-## Crush Skills
+## Agent Skills
 
-`cwt` bundles two [Crush skills](https://charm.sh/crush/) that enhance the AI assistant experience:
+`cwt` bundles skills that enhance the AI assistant experience. Skills are agent-aware — they install differently depending on your configured agent.
 
-- **cmux-notifications** — Teaches Crush to use cmux sidebar APIs (status bars, progress, log, toast notifications) to keep you informed
-- **cwt-orchestrator** — Teaches Crush to analyze project tickets, build execution plans with dependency graphs, and spawn parallel worktrees
+- **cmux-notifications** — Teaches the agent to use cmux sidebar APIs (status bars, progress, log, toast notifications)
+- **cwt-orchestrator** — Teaches the agent to analyze project tickets, build execution plans with dependency graphs, and spawn parallel worktrees
 
 ### Install skills
 
@@ -170,7 +182,14 @@ cwt skills install cmux-notifications
 cwt skills install --force
 ```
 
-Skills are installed to `~/.config/crush/skills/`. After installing, add them to your global Crush context in `~/.config/crush/crush.json`:
+### Where skills go
+
+| Agent | Install location | Format |
+|---|---|---|
+| Crush | `~/.config/crush/skills/<name>/SKILL.md` | Individual skill files |
+| Claude Code | `~/.claude/CLAUDE.md` | Appended with `<!-- cwt-skill:name -->` markers |
+
+For Crush, also add them to your global context in `~/.config/crush/crush.json`:
 
 ```jsonc
 {
@@ -186,15 +205,13 @@ Skills are installed to `~/.config/crush/skills/`. After installing, add them to
 }
 ```
 
-`context_paths` ensures the skills are loaded into every Crush session automatically, so Crush always knows how to use cmux notifications and orchestrate worktrees.
-
 ## How It Works
 
 1. `cwt spawn` creates a git worktree branched from your base branch
-2. A new cmux workspace is created with your configured panes (Crush, git tool, editor)
+2. A new cmux workspace is created with your configured panes
 3. Each pane is launched with `cd` into the worktree directory
-4. If `--ticket` is provided, Crush receives the ticket context as its first prompt
-5. If `--draft` is provided, Crush is instructed to create and maintain a ticket as it works
+4. **Crush**: ticket context is injected via `cmux send-text` after the agent is ready
+5. **Claude Code**: ticket context is passed as a CLI argument (`claude "prompt"`)
 6. cmux sidebar status is set with branch, base, and ticket info
 
 ## License

@@ -6,8 +6,8 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "cwt",
-	Short: "Crush Worktree Tool",
-	Long:  "Creates git worktrees with full cmux dev environments — crush, lazygit, helix, and more.",
+	Short: "cmux Worktree Tool",
+	Long:  "Creates git worktrees with full cmux dev environments — crush, claude code, lazygit, helix, and more.",
 }
 
 func Execute() error {

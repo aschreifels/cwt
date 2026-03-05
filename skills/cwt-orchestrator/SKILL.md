@@ -1,6 +1,6 @@
-# Crush Worktree Orchestrator
+# cmux Worktree Orchestrator
 
-You have access to `cwt` (Crush Worktree Tool) via bash, a Go CLI that creates git worktrees with full cmux dev environments (crush + lazygit + editor). Use this skill to analyze Linear projects or epics and spawn parallelized worktrees — each with its own crush instance that auto-receives the ticket context.
+You have access to `cwt` (cmux Worktree Tool) via bash, a Go CLI that creates git worktrees with full cmux dev environments (AI agent + lazygit + editor). Use this skill to analyze Linear projects or epics and spawn parallelized worktrees — each with its own AI agent instance that auto-receives the ticket context.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ Present a plan as a TODO list with:
 
 ### 4. Spawn Parallel Worktrees
 
-After confirmation, use `cwt spawn` to create worktrees. Each worktree gets its own crush session with the Linear ticket context automatically injected.
+After confirmation, use `cwt spawn` to create worktrees. Each worktree gets its own AI agent session with the Linear ticket context automatically injected.
 
 ```bash
 # Spawn a worktree for an existing ticket
@@ -59,10 +59,10 @@ Use cmux to check on worktree status:
 # List all workspaces to see active worktrees
 cmux list-workspaces
 
-# Read a specific workspace's screen to check crush progress
+# Read a specific workspace's screen to check agent progress
 cmux read-screen --workspace <id>
 
-# Send a message to a specific crush instance
+# Send a message to a specific agent instance
 cmux send --workspace <id> "status update please"
 ```
 
@@ -94,8 +94,8 @@ Key settings:
 - **branch_prefix**: Prepended to branch names (e.g. "jd" → `jd/PROJ-123_feature`)
 - **provider**: Project management integration (`linear`, `github`, `jira`, `none`)
 - **default_project**: Default project key for ticket lookups
-- **prompt templates**: Customizable templates for crush context injection with `{{provider}}`, `{{ticket}}`, `{{project}}`, `{{name}}` variables
-- **layout panes**: Configurable pane layout (crush, lazygit, editor positions)
+- **prompt templates**: Customizable templates for agent context injection with `{{provider}}`, `{{ticket}}`, `{{project}}`, `{{name}}` variables
+- **layout panes**: Configurable pane layout (agent, lazygit, editor positions)
 
 ## Rules
 

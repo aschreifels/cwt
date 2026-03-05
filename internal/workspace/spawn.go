@@ -124,7 +124,8 @@ func Spawn(cfg config.Config, opts SpawnOpts, updates chan<- StepUpdate) (*Spawn
 		return nil, fmt.Errorf("no main pane configured")
 	}
 
-	mainCmd := expandCommand(mainPane.Command, worktreeDir)
+	prompt := resolvePrompt(cfg, opts)
+	mainCmd := buildMainCommand(cfg, mainPane, worktreeDir, prompt)
 	updates <- StepUpdate{Pane: "workspace", Status: "creating"}
 
 	ws, err := cmux.NewWorkspace(mainCmd)
@@ -162,19 +163,22 @@ func Spawn(cfg config.Config, opts SpawnOpts, updates chan<- StepUpdate) (*Spawn
 		}
 	}
 
-	prompt := resolvePrompt(cfg, opts)
-	if prompt != "" {
-		updates <- StepUpdate{Pane: mainPane.Name, Status: "waiting for ready"}
-		if cmux.WaitForReady(ws.ID, mainSurface, 15*time.Second) {
-			time.Sleep(300 * time.Millisecond)
-			if err := cmux.SendText(ws.ID, mainSurface, prompt+"\\n"); err != nil {
-				updates <- StepUpdate{Pane: mainPane.Name, Status: "prompt send failed", Err: err}
+	if !cfg.IsClaude() {
+		if prompt != "" {
+			updates <- StepUpdate{Pane: mainPane.Name, Status: "waiting for ready"}
+			if cmux.WaitForReady(ws.ID, mainSurface, 15*time.Second) {
+				time.Sleep(300 * time.Millisecond)
+				if err := cmux.SendText(ws.ID, mainSurface, prompt+"\\n"); err != nil {
+					updates <- StepUpdate{Pane: mainPane.Name, Status: "prompt send failed", Err: err}
+				} else {
+					updates <- StepUpdate{Pane: mainPane.Name, Status: "prompt injected", Done: true}
+				}
 			} else {
-				updates <- StepUpdate{Pane: mainPane.Name, Status: "prompt injected", Done: true}
+				updates <- StepUpdate{Pane: mainPane.Name, Status: "not ready in time — send prompt manually", Err: fmt.Errorf("timeout")}
 			}
-		} else {
-			updates <- StepUpdate{Pane: mainPane.Name, Status: "not ready in time — send prompt manually", Err: fmt.Errorf("timeout")}
 		}
+	} else if prompt != "" {
+		updates <- StepUpdate{Pane: mainPane.Name, Status: "prompt passed via CLI", Done: true}
 	}
 
 	cmux.SetStatus(ws.ID, "branch", branchName, "git-branch", "")
@@ -192,9 +196,21 @@ func Spawn(cfg config.Config, opts SpawnOpts, updates chan<- StepUpdate) (*Spawn
 	return result, nil
 }
 
-const skillLoadingPrompt = "IMPORTANT: Before doing anything else, load your cmux-notifications skill " +
+const crushSkillLoadingPrompt = "IMPORTANT: Before doing anything else, load your cmux-notifications skill " +
 	"and use it throughout this session. Once loaded, set your cmux status to ready: " +
-	"`cmux set-status \"crush\" \"ready\" --icon \"sparkle\" --color \"#22c55e\"`"
+	"`cmux set-status \"cwt\" \"ready\" --icon \"sparkle\" --color \"#22c55e\"`"
+
+const claudeSkillLoadingPrompt = "IMPORTANT: Before doing anything else, follow the cwt skill instructions from your " +
+	"CLAUDE.md context (cmux-notifications, cwt-orchestrator). Use them throughout this session. " +
+	"Once ready, set your cmux status: " +
+	"`cmux set-status \"cwt\" \"ready\" --icon \"sparkle\" --color \"#22c55e\"`"
+
+func skillLoadingPrompt(cfg config.Config) string {
+	if cfg.IsClaude() {
+		return claudeSkillLoadingPrompt
+	}
+	return crushSkillLoadingPrompt
+}
 
 func resolvePrompt(cfg config.Config, opts SpawnOpts) string {
 	var prompt string
@@ -208,9 +224,9 @@ func resolvePrompt(cfg config.Config, opts SpawnOpts) string {
 	}
 
 	if prompt != "" {
-		return prompt + "\n\n" + skillLoadingPrompt
+		return prompt + "\n\n" + skillLoadingPrompt(cfg)
 	}
-	return skillLoadingPrompt
+	return skillLoadingPrompt(cfg)
 }
 
 func createSplits(cfg config.Config, wsID, worktreeDir, mainSurface string, sidePanes []config.PaneConfig, result *SpawnResult, updates chan<- StepUpdate) error {
@@ -264,6 +280,14 @@ func launchInPane(wsID, surfaceRef string, pane config.PaneConfig, worktreeDir s
 	cmd := fmt.Sprintf("cd %s && %s", shellQuote(worktreeDir), expandCommand(pane.Command, worktreeDir))
 	cmux.SendPanel(wsID, surfaceRef, cmd)
 	cmux.SendKeyPanel(wsID, surfaceRef, "enter")
+}
+
+func buildMainCommand(cfg config.Config, pane config.PaneConfig, worktreeDir, prompt string) string {
+	cmd := expandCommand(pane.Command, worktreeDir)
+	if cfg.IsClaude() && prompt != "" {
+		cmd = cmd + " " + shellQuote(prompt)
+	}
+	return cmd
 }
 
 func expandCommand(cmd, worktreeDir string) string {
