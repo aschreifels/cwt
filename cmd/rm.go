@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
+	"github.com/aschreifels/cwt/internal/cmux"
 	"github.com/aschreifels/cwt/internal/config"
 	"github.com/aschreifels/cwt/internal/git"
 	"github.com/spf13/cobra"
@@ -44,14 +46,45 @@ var rmCmd = &cobra.Command{
 			}
 		}
 
+		var wg sync.WaitGroup
+		var worktreeErr, cmuxErr error
+
 		if info, err := os.Stat(worktreeDir); err == nil && info.IsDir() {
-			fmt.Printf("  Removing worktree at %s...\n", worktreeDir)
-			if err := git.WorktreeRemove(worktreeDir); err != nil {
-				return err
-			}
-			fmt.Println("  ✓ Worktree removed")
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				fmt.Printf("  Removing worktree at %s...\n", worktreeDir)
+				if err := git.WorktreeRemoveFast(worktreeDir); err != nil {
+					worktreeErr = err
+					return
+				}
+				fmt.Println("  ✓ Worktree removed")
+			}()
 		} else {
 			fmt.Printf("  No worktree found at %s\n", worktreeDir)
+		}
+
+		wsID := cmux.FindWorkspaceByName(name)
+		if wsID != "" {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				fmt.Printf("  Closing cmux workspace %s...\n", name)
+				if err := cmux.CloseWorkspace(wsID); err != nil {
+					cmuxErr = err
+					return
+				}
+				fmt.Println("  ✓ Workspace closed")
+			}()
+		}
+
+		wg.Wait()
+
+		if worktreeErr != nil {
+			return worktreeErr
+		}
+		if cmuxErr != nil {
+			return cmuxErr
 		}
 
 		if rmDeleteBranch && realBranch != "" {
