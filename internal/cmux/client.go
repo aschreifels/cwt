@@ -151,6 +151,22 @@ func ListWorkspaces() (string, error) {
 	return run("list-workspaces")
 }
 
+func FindWorkspaceByName(name string) string {
+	out, err := ListWorkspaces()
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		for i, f := range fields {
+			if f == name && i > 0 {
+				return fields[0]
+			}
+		}
+	}
+	return ""
+}
+
 func WaitForReady(wsID, surfaceRef string, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {

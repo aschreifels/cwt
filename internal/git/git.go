@@ -2,9 +2,11 @@ package git
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 func RepoRoot() (string, error) {
@@ -50,6 +52,42 @@ func WorktreeRemove(worktreeDir string) error {
 	if err != nil {
 		return fmt.Errorf("git worktree remove: %w: %s", err, out)
 	}
+	return nil
+}
+
+func WorktreeRemoveFast(worktreeDir string) error {
+	tmpDir := worktreeDir + fmt.Sprintf(".cwt-rm-%d", os.Getpid())
+
+	renamed := false
+	if err := os.Rename(worktreeDir, tmpDir); err == nil {
+		renamed = true
+	} else {
+		tmpDir = worktreeDir
+	}
+
+	cmd := exec.Command("git", "worktree", "prune")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree prune: %w: %s", err, out)
+	}
+
+	if renamed {
+		rmCmd := exec.Command("/bin/rm", "-rf", tmpDir)
+		rmCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		if err := rmCmd.Start(); err != nil {
+			os.RemoveAll(tmpDir)
+			return nil
+		}
+		go func() {
+			rmCmd.Wait()
+		}()
+	} else {
+		rmCmd := exec.Command("/bin/rm", "-rf", tmpDir)
+		if out, err := rmCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("removing worktree directory: %w: %s", err, out)
+		}
+	}
+
 	return nil
 }
 
