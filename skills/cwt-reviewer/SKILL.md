@@ -16,6 +16,8 @@ Execute every step in order. Do not skip steps. Do not ask the user for informat
 
 ### Step 1: Fetch PR Context
 
+The injected prompt includes PR metadata and the list of changed files, but **not** the diff. You must fetch the diff and any other details yourself.
+
 Using the `gh` CLI:
 
 ```bash

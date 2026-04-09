@@ -29,7 +29,7 @@ func ReviewWorkspaceName(prNumber int) string {
 	return fmt.Sprintf("review-%d", prNumber)
 }
 
-func BuildReviewPrompt(cfg config.Config, pr *git.PRInfo, diff string) string {
+func BuildReviewPrompt(cfg config.Config, pr *git.PRInfo) string {
 	var b strings.Builder
 
 	b.WriteString(cfg.Review.Prompt)
@@ -37,29 +37,12 @@ func BuildReviewPrompt(cfg config.Config, pr *git.PRInfo, diff string) string {
 
 	b.WriteString(fmt.Sprintf("## PR #%d: %s\n", pr.Number, pr.Title))
 	b.WriteString(fmt.Sprintf("**Author:** %s\n", pr.Author.Login))
-	b.WriteString(fmt.Sprintf("**Branch:** %s → %s\n", pr.HeadRefName, pr.BaseRefName))
-	b.WriteString(fmt.Sprintf("**Size:** +%d / -%d across %d files\n\n", pr.Additions, pr.Deletions, len(pr.Files)))
+	b.WriteString(fmt.Sprintf("**Branch:** %s → %s\n\n", pr.HeadRefName, pr.BaseRefName))
 
 	if pr.Body != "" {
 		b.WriteString("## PR Description\n")
 		b.WriteString(pr.Body)
 		b.WriteString("\n\n")
-	}
-
-	b.WriteString("## Changed Files\n")
-	for _, f := range pr.Files {
-		b.WriteString(fmt.Sprintf("- `%s` (+%d / -%d)\n", f.Path, f.Additions, f.Deletions))
-	}
-	b.WriteString("\n")
-
-	if diff != "" {
-		const maxDiffLen = 30000
-		if len(diff) > maxDiffLen {
-			diff = diff[:maxDiffLen] + "\n\n... (diff truncated, use `gh pr diff` for full diff)"
-		}
-		b.WriteString("## Diff\n```diff\n")
-		b.WriteString(diff)
-		b.WriteString("\n```\n")
 	}
 
 	return b.String()
@@ -80,15 +63,6 @@ func Review(cfg config.Config, opts ReviewOpts, updates chan<- StepUpdate) (*Rev
 	result.PRInfo = pr
 	result.BranchName = pr.HeadRefName
 	updates <- StepUpdate{Pane: "pr", Status: fmt.Sprintf("#%d: %s", pr.Number, pr.Title), Done: true}
-
-	updates <- StepUpdate{Pane: "diff", Status: "fetching"}
-	diff, err := git.GHPRDiff(opts.PRNumber, opts.Repo)
-	if err != nil {
-		updates <- StepUpdate{Pane: "diff", Status: "failed (will use gh in review)", Done: true, Err: err}
-		diff = ""
-	} else {
-		updates <- StepUpdate{Pane: "diff", Status: "fetched", Done: true}
-	}
 
 	var worktreeDir string
 	if !opts.NoCheckout {
@@ -119,7 +93,7 @@ func Review(cfg config.Config, opts ReviewOpts, updates chan<- StepUpdate) (*Rev
 		return nil, fmt.Errorf("no main pane configured")
 	}
 
-	prompt := BuildReviewPrompt(cfg, pr, diff)
+	prompt := BuildReviewPrompt(cfg, pr)
 
 	var mainCmd string
 	if worktreeDir != "" {
