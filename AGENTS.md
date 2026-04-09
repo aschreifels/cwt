@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-`cwt` is a Go CLI that creates git worktrees with full [cmux](https://github.com/charmbracelet/cmux) dev environments. Each worktree gets its own AI coding agent (Crush or Claude Code), git TUI, and editor in a multi-pane workspace. It supports ticket integration (Linear, GitHub Issues, Jira) and bundles installable agent skills.
+`cwt` is a Go CLI that creates git worktrees with full [cmux](https://github.com/charmbracelet/cmux) dev environments. Each worktree gets its own AI coding agent (Crush or Claude Code), git TUI, and editor in a multi-pane workspace. It supports ticket integration (Linear, GitHub Issues, Jira), PR review workspaces, and bundles installable agent skills.
 
 ## Commands
 
@@ -32,6 +32,7 @@ cmd/
   spawn.go                       # cwt spawn — main feature, creates worktree + cmux workspace
   init.go                        # cwt init — TUI config wizard (charmbracelet/huh)
   list.go                        # cwt list/ls — lists active worktrees
+  review.go                      # cwt review — opens a PR review workspace (no worktree required)
   rm.go                          # cwt rm — removes worktrees, optional branch delete
   skills.go                      # cwt skills list/install — manages agent skills (Crush + Claude Code)
   version.go                     # cwt version — prints version info (injected via ldflags)
@@ -42,8 +43,12 @@ internal/
   workspace/
     spawn.go                     # Core spawn logic: git worktree + cmux workspace creation
     spawn_test.go                # Unit tests for branch naming, dir resolution, prompts
+    review.go                    # Review workspace logic: PR fetch, diff, prompt building
+    review_test.go               # Unit tests for review prompt, workspace naming
   git/
     git.go                       # Git operations via exec.Command (worktree add/remove/list, branch ops)
+    gh.go                        # GitHub CLI (gh) helpers: PR view, diff, repo detection, URL parsing
+    gh_test.go                   # Unit tests for URL parsing
   cmux/
     client.go                    # cmux CLI wrapper (workspaces, splits, send, status, progress, notify)
   tui/
@@ -53,6 +58,12 @@ skills/
   skills_test.go                 # Verifies all embedded skills exist and have content
   cmux-notifications/SKILL.md    # Skill: teaches agent to use cmux sidebar APIs
   cwt-orchestrator/SKILL.md      # Skill: teaches agent to orchestrate parallel worktrees
+  cwt-reviewer/SKILL.md          # Skill: PR review router — detects languages, dispatches to domain skills
+  cwt-reviewer-comments/SKILL.md # Skill: posts review findings as inline GitHub PR comments
+  cwt-reviewer-go/SKILL.md       # Skill: Go-specific PR review checklist
+  cwt-reviewer-typescript/SKILL.md # Skill: TypeScript-specific PR review checklist
+  cwt-reviewer-database/SKILL.md # Skill: database/migration PR review checklist
+  cwt-reviewer-infra/SKILL.md    # Skill: infrastructure/CI-CD PR review checklist
 ```
 
 ## Architecture and Key Patterns
@@ -65,7 +76,7 @@ skills/
 
 ### Config System (`internal/config`)
 - TOML config at `~/.config/cwt/config.toml` (respects `XDG_CONFIG_HOME`)
-- `Config` struct with `Defaults`, `Layout`, and `ProjectManagement` sections
+- `Config` struct with `Defaults`, `Layout`, `ProjectManagement`, and `Review` sections
 - `Defaults.Agent` field: `"crush"` (default) or `"claude"` — determines pane commands, prompt injection, and skill installation
 - `DefaultConfig()` provides sensible defaults for Crush; `DefaultConfigForAgent(agent)` for agent-specific defaults
 - `Load()` merges file config with defaults — empty prompts, empty pane lists, and empty agent are backfilled
@@ -74,9 +85,10 @@ skills/
 
 ### External Tool Integration
 - **git**: All git operations in `internal/git/git.go` via `exec.Command` — no git library
+- **gh**: GitHub CLI operations in `internal/git/gh.go` via `exec.Command("gh", ...)` — PR view, diff, repo detection
 - **cmux**: All cmux operations in `internal/cmux/client.go` via `exec.Command("cmux", ...)` — wraps the CLI
-- Both packages parse CLI output (porcelain format for git, `OK <id>` for cmux)
-- No mocking of these — tests that need git/cmux are either pure-logic unit tests or require the real tools
+- All three packages parse CLI output (porcelain format for git, JSON for gh, `OK <id>` for cmux)
+- No mocking of these — tests that need git/cmux/gh are either pure-logic unit tests or require the real tools
 
 ### Spawn Flow (`workspace.Spawn`)
 1. Build branch name (prefix + ticket + name)
@@ -89,6 +101,17 @@ skills/
 8. Inject prompt: Crush via `cmux send-text`, Claude via CLI argument to `claude "prompt"`
 9. Set cmux sidebar status (branch, base, ticket, provider)
 - Progress is reported via `chan StepUpdate` → Bubble Tea model
+
+### Review Flow (`workspace.Review`)
+1. Fetch PR metadata via `gh pr view --json` (title, body, files, author, branch)
+2. Fetch PR diff via `gh pr diff`
+3. Optionally check out PR branch in a lightweight worktree (`../worktrees/review-<pr>`)
+4. Build review prompt (PR context + diff + review config template)
+5. Create cmux workspace (reuses spawn's TUI and pane layout)
+6. Inject prompt to agent (same mechanism as spawn)
+7. Set cmux sidebar status (PR number, branch, author, review mode)
+- The `--no-checkout` flag skips the worktree and reviews in the current directory
+- The `--url` flag allows reviewing PRs from other repos
 
 ### TUI (`internal/tui`)
 - Bubble Tea (charmbracelet/bubbletea) for the spawn progress view
@@ -104,7 +127,9 @@ skills/
 ### Skills System
 - Skills are embedded at compile time via `//go:embed` directives in `skills/skills.go`
 - Each skill is a `SKILL.md` file in a subdirectory under `skills/`
-- `skills.All()` returns the full registry
+- `skills.All()` returns the full registry (8 skills total)
+- `skills.ReviewSkills()` returns only the 6 review-related skills
+- Review skills use a router pattern: `cwt-reviewer` detects languages/domains and dispatches to specific skills (`cwt-reviewer-go`, `cwt-reviewer-typescript`, `cwt-reviewer-database`, `cwt-reviewer-infra`), with `cwt-reviewer-comments` handling GitHub PR comment posting
 - Installation is agent-aware:
   - **Crush**: copies to `~/.config/crush/skills/<dir>/SKILL.md`
   - **Claude Code**: appends to `~/.claude/CLAUDE.md` with `<!-- cwt-skill:name -->` markers for idempotent updates
@@ -116,7 +141,7 @@ skills/
 - Error wrapping with `fmt.Errorf("context: %w", err)` — consistent `context: %w` pattern
 - Package-level vars for cobra flags and lipgloss styles
 - Exported functions use clear verb-noun names: `BuildBranchName`, `ResolveWorktreeDir`, `ResolveBaseBranch`
-- Unexported helpers: `expandCommand`, `shellQuote`, `resolvePrompt`, `buildMainCommand`, `skillLoadingPrompt`, `parseSurface`
+- Unexported helpers: `expandCommand`, `shellQuote`, `resolvePrompt`, `buildMainCommand`, `skillLoadingPrompt`, `parseSurface`, `extractRepoFromURL`
 - No constructor functions for simple structs — use struct literals directly
 
 ### Error Handling
@@ -144,14 +169,15 @@ skills/
 1. Create `skills/<skill-name>/SKILL.md`
 2. Add `//go:embed <skill-name>/SKILL.md` var in `skills/skills.go`
 3. Add entry to `All()` slice with Name, Description, Dir, Content
-4. Update `skills_test.go` — increment expected count and add name to `expected` map
+4. If it's a review skill, add it to `ReviewSkills()` filter
+5. Update `skills_test.go` — increment expected count and add name to `expected` map
 
 ## Gotchas
 
 - **Version injection**: `cmd/version.go` vars (`version`, `commit`, `date`) are set via `-ldflags` at build time. Running `go run .` shows `dev`/`none`/`unknown`. Use `make build` for real version info.
 - **cmux dependency**: Most of the spawn flow requires a running cmux instance. Without it, `cwt spawn` will fail at workspace creation. Tests don't exercise this path.
 - **git worktree location**: Default worktree directory is `../worktrees/` relative to repo root (via `git.DefaultWorktreeBase()`). This can be overridden in config with `defaults.worktree_dir`.
-- **Auto-init**: `cwt spawn` automatically triggers `cwt init` if no config file exists (`cmd/spawn.go:46`).
+- **Auto-init**: `cwt spawn` and `cwt review` automatically trigger `cwt init` if no config file exists.
 - **Template variables**: Pane commands and prompt templates use `{{worktree_dir}}` and other mustache-style variables — these are simple string replacements, not a template engine.
 - **Shell quoting**: `shellQuote()` in `workspace/spawn.go` uses single-quote wrapping with escaped internal quotes — be aware when constructing commands with special characters.
 - **Sleep timers**: `workspace.Spawn` uses `time.Sleep(300ms)` delays between cmux operations to allow the terminal to settle. These are not configurable.
