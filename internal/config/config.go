@@ -13,6 +13,7 @@ type Config struct {
 	Defaults          DefaultsConfig          `toml:"defaults"`
 	Layout            LayoutConfig            `toml:"layout"`
 	ProjectManagement ProjectManagementConfig `toml:"project_management"`
+	Review            ReviewConfig            `toml:"review"`
 }
 
 type DefaultsConfig struct {
@@ -42,6 +43,10 @@ type ProjectManagementConfig struct {
 type PromptConfig struct {
 	Fetch  string `toml:"fetch"`
 	Create string `toml:"create"`
+}
+
+type ReviewConfig struct {
+	Prompt string `toml:"prompt"`
 }
 
 const (
@@ -75,6 +80,12 @@ func DefaultConfigForAgent(agent string) Config {
 					"and acceptance criteria based on what was actually built.",
 			},
 		},
+	}
+
+	cfg.Review = ReviewConfig{
+		Prompt: "Review this pull request thoroughly. Use your cwt-reviewer skill to route to the appropriate " +
+			"language/domain-specific review skills based on the files changed. " +
+			"Present the review in conversation first — do not post comments to GitHub unless I ask you to.",
 	}
 
 	switch agent {
@@ -135,6 +146,9 @@ func Load() (Config, error) {
 	}
 
 	defaults := DefaultConfig()
+	if cfg.Review.Prompt == "" {
+		cfg.Review.Prompt = defaults.Review.Prompt
+	}
 	if cfg.ProjectManagement.Prompts.Fetch == "" {
 		cfg.ProjectManagement.Prompts.Fetch = defaults.ProjectManagement.Prompts.Fetch
 	}
