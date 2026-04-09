@@ -45,7 +45,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 	}
 
 	t.Run("includes PR metadata", func(t *testing.T) {
-		prompt := BuildReviewPrompt(cfg, pr, "some diff")
+		prompt := BuildReviewPrompt(cfg, pr)
 		if !strings.Contains(prompt, "#42") {
 			t.Error("expected prompt to contain PR number")
 		}
@@ -64,51 +64,40 @@ func TestBuildReviewPrompt(t *testing.T) {
 	})
 
 	t.Run("includes PR description", func(t *testing.T) {
-		prompt := BuildReviewPrompt(cfg, pr, "")
+		prompt := BuildReviewPrompt(cfg, pr)
 		if !strings.Contains(prompt, "This PR adds a review command") {
 			t.Error("expected prompt to contain PR body")
 		}
 	})
 
-	t.Run("includes changed files", func(t *testing.T) {
-		prompt := BuildReviewPrompt(cfg, pr, "")
-		if !strings.Contains(prompt, "cmd/review.go") {
-			t.Error("expected prompt to contain changed file paths")
+	t.Run("does not include changed files summary", func(t *testing.T) {
+		prompt := BuildReviewPrompt(cfg, pr)
+		if strings.Contains(prompt, "Changed Files") {
+			t.Error("prompt should not contain changed files summary — agent discovers files itself")
 		}
-		if !strings.Contains(prompt, "internal/workspace/review.go") {
-			t.Error("expected prompt to contain all changed files")
-		}
-	})
-
-	t.Run("includes diff when provided", func(t *testing.T) {
-		prompt := BuildReviewPrompt(cfg, pr, "diff content here")
-		if !strings.Contains(prompt, "diff content here") {
-			t.Error("expected prompt to contain diff")
+		if strings.Contains(prompt, "+80 / -0") {
+			t.Error("prompt should not contain per-file addition/deletion counts")
 		}
 	})
 
-	t.Run("truncates large diffs", func(t *testing.T) {
-		largeDiff := strings.Repeat("x", 40000)
-		prompt := BuildReviewPrompt(cfg, pr, largeDiff)
-		if !strings.Contains(prompt, "diff truncated") {
-			t.Error("expected large diff to be truncated")
-		}
-		if len(prompt) > 50000 {
-			t.Errorf("prompt too large after truncation: %d bytes", len(prompt))
+	t.Run("does not include diff", func(t *testing.T) {
+		prompt := BuildReviewPrompt(cfg, pr)
+		if strings.Contains(prompt, "## Diff") {
+			t.Error("prompt should not contain diff section — agent fetches diff itself")
 		}
 	})
 
 	t.Run("handles empty body", func(t *testing.T) {
 		noBod := *pr
 		noBod.Body = ""
-		prompt := BuildReviewPrompt(cfg, &noBod, "")
+		prompt := BuildReviewPrompt(cfg, &noBod)
 		if strings.Contains(prompt, "## PR Description") {
 			t.Error("should not include description section when body is empty")
 		}
 	})
 
 	t.Run("includes review config prompt", func(t *testing.T) {
-		prompt := BuildReviewPrompt(cfg, pr, "")
+		prompt := BuildReviewPrompt(cfg, pr)
 		if !strings.Contains(prompt, "cwt-reviewer") {
 			t.Error("expected prompt to reference the review skill")
 		}
