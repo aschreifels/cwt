@@ -103,7 +103,11 @@ func Review(cfg config.Config, opts ReviewOpts, updates chan<- StepUpdate) (*Rev
 	}
 
 	updates <- StepUpdate{Pane: "workspace", Status: "creating"}
-	ws, err := cmux.NewWorkspace(mainCmd)
+	cwd := worktreeDir
+	if cwd == "" {
+		cwd = "."
+	}
+	ws, err := cmux.NewWorkspace(mainCmd, cwd)
 	if err != nil {
 		return nil, fmt.Errorf("creating workspace: %w", err)
 	}

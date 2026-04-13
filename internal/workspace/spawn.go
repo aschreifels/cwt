@@ -128,7 +128,7 @@ func Spawn(cfg config.Config, opts SpawnOpts, updates chan<- StepUpdate) (*Spawn
 	mainCmd := buildMainCommand(cfg, mainPane, worktreeDir, prompt)
 	updates <- StepUpdate{Pane: "workspace", Status: "creating"}
 
-	ws, err := cmux.NewWorkspace(mainCmd)
+	ws, err := cmux.NewWorkspace(mainCmd, worktreeDir)
 	if err != nil {
 		return nil, fmt.Errorf("creating workspace: %w", err)
 	}

@@ -20,8 +20,15 @@ type WorkspaceResult struct {
 	ID string
 }
 
-func NewWorkspace(command string) (WorkspaceResult, error) {
-	out, err := run("new-workspace", "--command", command)
+func NewWorkspace(command, cwd string) (WorkspaceResult, error) {
+	args := []string{"new-workspace"}
+	if cwd != "" {
+		args = append(args, "--cwd", cwd)
+	}
+	if command != "" {
+		args = append(args, "--command", command)
+	}
+	out, err := run(args...)
 	if err != nil {
 		return WorkspaceResult{}, err
 	}
